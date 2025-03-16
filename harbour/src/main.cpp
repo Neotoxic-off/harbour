@@ -1,10 +1,10 @@
-#include "cli.hpp"
+#include "core.hpp"
 
-int main(int argc, char* argv[])
+int main(int argc, char** argv)
 {
-    Cli cli;
+    Core core = Core(argc, argv);
 
-    std::cout << "Harbour CLI is running!" << std::endl;
+    core.Parse();
 
     return 0; 
 }

@@ -32,3 +32,5 @@
 *.app
 
 harbour/build/*
+
+.vscode
