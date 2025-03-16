@@ -1,2 +1,2 @@
 # harbour
-🛟 Harbour is your Rust-powered port for container management
+🛟 Harbour is your C++ powered port for container management

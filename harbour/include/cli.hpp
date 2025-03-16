@@ -1,6 +1,5 @@
 #pragma once
 
-#include <format>
 #include <iostream>
 
 class Cli
@@ -8,4 +7,4 @@ class Cli
     public:
         Cli();
         ~Cli();
-}
+};
