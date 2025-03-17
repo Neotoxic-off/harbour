@@ -16,7 +16,10 @@ void Core::Initialize()
     spdlog::set_level(spdlog::level::debug);
 
     this->config_directory.path = GetConfigDirectory();
-    this->config_directory.Create();
+
+    if (this->config_directory.Exists() == false) {
+        this->config_directory.Create();
+    }
 }
 
 const char* Core::GetConfigDirectory()
