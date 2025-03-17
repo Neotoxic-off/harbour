@@ -8,7 +8,7 @@
 class File
 {
     public:
-        const char* path;
+        std::string path;
         bool exists;
 
         File();

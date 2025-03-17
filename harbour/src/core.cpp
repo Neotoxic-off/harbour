@@ -22,21 +22,21 @@ void Core::Initialize()
     }
 }
 
-const char* Core::GetConfigDirectory()
+std::string Core::GetConfigDirectory()
 {
     #ifdef _WIN32
         const char* homeDir = std::getenv("USERPROFILE");
-        if (homeDir) {
-            static std::string configPath = std::string(homeDir) + "\\.harbour";
-            return configPath.c_str();
-        }
     #else
         const char* homeDir = std::getenv("HOME");
-        if (homeDir) {
-            static std::string configPath = std::string(homeDir) + "/.harbour";
-            return configPath.c_str();
-        }
     #endif
+
+    if (homeDir) {
+        std::filesystem::path configPath = std::filesystem::path(homeDir) / CONFIG_DIRECTORY;
+
+        return configPath.string();
+    }
+
+    return CONFIG_DIRECTORY;
 }
 
 void Core::Parse()

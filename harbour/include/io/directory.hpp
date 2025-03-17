@@ -8,7 +8,7 @@
 class Directory
 {
     public:
-        const char* path;
+        std::string path;
         bool exists;
 
         Directory();

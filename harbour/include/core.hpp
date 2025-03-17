@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <filesystem>
 
 #include "spdlog/spdlog.h"
 
@@ -18,7 +19,7 @@ class Core
         int argc;
         char** argv;
 
-        const char* GetConfigDirectory();
+        std::string GetConfigDirectory();
  
     public:
         Core(int argc, char** argv);
