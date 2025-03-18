@@ -41,7 +41,11 @@ std::string Core::GetConfigDirectory()
 
 void Core::Parse()
 {
-    spdlog::info("Welcome");
+    bool status = this->arguments.Parse(this->argc, this->argv);
 
-    this->arguments.Parse(this->argc, this->argv);
+    if (status == false) {
+        spdlog::error("Failed to parse arguments");
+    } else {
+        spdlog::info(this->arguments.program.get<std::string>("path"));
+    }
 }

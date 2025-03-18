@@ -31,6 +31,7 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
     GIT_TAG v1.15.1
 )
+
 FetchContent_MakeAvailable(spdlog)
 FetchContent_MakeAvailable(tomlplusplus)
 FetchContent_MakeAvailable(indicators)
