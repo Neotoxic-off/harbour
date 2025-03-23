@@ -1,12 +1,12 @@
 services:
   app:
     build: ..\examples\01\app\Dockerfile
-    restart: always
+    restart: no
     networks:
     - bridge
-  database:
-    build: ..\examples\01\database\Dockerfile
-    restart: always
+  '01':
+    build: ..\examples\01\databas
+    restart: no
     networks:
     - bridge
 networks:

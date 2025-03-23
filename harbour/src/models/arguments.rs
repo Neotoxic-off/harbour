@@ -15,7 +15,9 @@ pub struct Arguments {
     #[arg(short, long)]
     pub network: Option<String>,
 
-    #[arg(short, long, value_parser = clap::builder::PossibleValuesParser::new(["no", "always", "on-failure", "unless-stopped"]), default_value = "no")]
+    #[arg(short, long, value_parser = clap::builder::PossibleValuesParser::new(
+        ["no", "always", "on-failure", "unless-stopped"]
+    ), default_value = "no")]
     pub restart: String,
 
     #[arg(short, long, default_value = "docker-compose.yml")]
