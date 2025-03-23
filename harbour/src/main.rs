@@ -1,5 +1,3 @@
-use log::{info, error};
-
 mod models;
 mod setup;
 mod compose;
