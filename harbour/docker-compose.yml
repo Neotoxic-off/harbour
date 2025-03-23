@@ -1,0 +1,10 @@
+services:
+  app:
+    build: ..\examples\01\app\Dockerfile
+    restart: no
+  database:
+    build: ..\examples\01\database\Dockerfile
+    restart: no
+networks:
+  test:
+    driver: bridge
