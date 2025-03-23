@@ -1,11 +1,13 @@
-mod models;
-mod setup;
-mod compose;
-pub mod logger;
-
 use models::arguments::Arguments;
 use clap::Parser;
 use logger::{log_error, log_info};
+
+mod models;
+mod setup;
+mod compose;
+
+pub mod logger;
+pub mod io;
 
 fn initlialize(args: Arguments) -> () {
     let mut generator: compose::Compose = compose::Compose::new(args);
@@ -21,8 +23,9 @@ fn main() {
 
     let args: Arguments = Arguments::parse();
     
-    if !args.dockerfiles.is_empty() {
+    if !args.services.is_empty() {
         initlialize(args);
+        
         return;
     }
 

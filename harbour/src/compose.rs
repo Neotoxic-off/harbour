@@ -2,8 +2,9 @@ use std::fs;
 use std::path::Path;
 use std::error::Error;
 use serde_yaml::{Value, Mapping};
-use crate::logger::{log_info, log_warn, log_error};
 
+use crate::io::directory::Directory;
+use crate::logger::{log_info, log_warn, log_error};
 use crate::models::arguments::{Arguments, ServiceConfig};
 
 pub struct Compose {
@@ -15,6 +16,7 @@ pub struct Compose {
 impl Compose {
     pub fn new(args: Arguments) -> Self {
         log_info("Initializing Compose with provided arguments", None);
+
         Self {
             args,
             services: Mapping::new(),
@@ -24,6 +26,7 @@ impl Compose {
 
     pub fn generate(&mut self) -> Result<String, Box<dyn Error>> {
         log_info("Starting compose generation", None);
+
         let mut compose: Mapping = Mapping::new();
 
         self.services = self.generate_services()?;
@@ -43,6 +46,7 @@ impl Compose {
 
     fn render(&self, compose: &Mapping) -> Result<String, Box<dyn Error>> {
         log_info("Rendering the final output", None);
+
         let yaml_string = match serde_yaml::to_string(&compose) {
             Ok(yaml) => yaml,
             Err(e) => {
@@ -63,22 +67,29 @@ impl Compose {
 
     fn generate_services(&self) -> Result<Mapping, Box<dyn Error>> {
         log_info("Generating services configuration", None);
+
         let mut services: Mapping = Mapping::new();
 
-        for (i, file) in self.args.dockerfiles.iter().enumerate() {
-            if let Err(e) = self.process_service(file, i, &mut services) {
-                log_error("Failed to process service", Some(&e.to_string()));
+        for (i, path) in self.args.services.iter().enumerate() {
+            let service_directory: Directory = Directory::new(path.to_owned());
+            if service_directory.exists == true {
+                if let Err(e) = self.process_service(path, i, &mut services) {
+                    log_error("Failed to process service", Some(&e.to_string()));
+                }
+            } else {
+                log_error("Service path directory not found", Some(&service_directory.path));
             }
         }
+
         Ok(services)
     }
 
-    fn process_service(&self, file: &String, index: usize, services: &mut Mapping) -> Result<(), Box<dyn Error>> {
-        let service_name = self.get_service_name(file, index);
+    fn process_service(&self, path: &String, index: usize, services: &mut Mapping) -> Result<(), Box<dyn Error>> {
+        let service_name = self.get_service_name(path, index);
 
         log_info("Processing Dockerfile for service", Some(&service_name));
 
-        let service_config = self.create_service_config(file);
+        let service_config = self.create_service_config(path);
 
         if self.service_already_defined(services, &service_name) {
             log_warn("Service already defined, skipping", Some(&service_name));
@@ -92,7 +103,9 @@ impl Compose {
                 e
             })?
         );
+
         log_info("Service added successfully", Some(&service_name));
+
         Ok(())
     }
 
@@ -100,10 +113,8 @@ impl Compose {
         log_info("Determining service name from file", Some(file));
 
         Path::new(file)
-            .parent()
-            .and_then(|p| p.file_name())
-            .unwrap_or_default()
-            .to_str()
+            .file_name()
+            .and_then(|os_str| os_str.to_str())
             .unwrap_or(&format!("service_{}", index))
             .to_string()
     }
@@ -121,28 +132,31 @@ impl Compose {
     }
 
     fn service_already_defined(&self, services: &Mapping, service_name: &String) -> bool {
-        let exists = services.contains_key(&Value::String(service_name.clone()));
-        if exists {
+        let exists: bool = services.contains_key(&Value::String(service_name.clone()));
+
+        if exists == true {
             log_warn("Service is already defined", Some(service_name));
         }
+
         exists
     }
 
     fn generate_networks(&self) -> Result<Mapping, Box<dyn Error>> {
         log_info("Generating networks configuration", None);
         let mut networks: Mapping = Mapping::new();
-
-        if let Some(network_name) = &self.args.network {
-            self.add_custom_network(&mut networks, network_name);
-        } else if networks.is_empty() {
-            self.add_default_network(&mut networks);
+    
+        match &self.args.network {
+            Some(network_name) => self.add_custom_network(&mut networks, network_name),
+            None if networks.is_empty() => self.add_default_network(&mut networks),
+            _ => {}
         }
-
+    
         Ok(networks)
     }
 
     fn add_custom_network(&self, networks: &mut Mapping, network_name: &String) {
         log_info("Adding custom network", Some(network_name));
+
         if !networks.contains_key(&Value::String(network_name.clone())) {
             networks.insert(
                 Value::String(network_name.clone()),

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 )]
 pub struct Arguments {
     #[arg(short, long, required = true, num_args = 1.., value_delimiter = ' ')]
-    pub dockerfiles: Vec<String>,
+    pub services: Vec<String>,
 
     #[arg(short, long)]
     pub network: Option<String>,
@@ -33,7 +33,6 @@ pub struct ServiceConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConfigFile {
-    pub version: Option<String>,
     pub services: HashMap<String, ServiceConfig>,
     pub networks: Option<HashMap<String, NetworkConfig>>
 }
