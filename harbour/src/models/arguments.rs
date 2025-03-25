@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Parser, Debug)]
 #[command(
-    version = "1.0", 
+    version = "0.1", 
     author = "Harbour", 
     about = "🛟 Harbour is your rust powered port for container management"
 )]
