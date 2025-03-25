@@ -1,16 +1,36 @@
 use std::fs;
 use std::path::Path;
 use std::error::Error;
+use std::collections::HashMap;
 use serde_yaml::{Value, Mapping};
+use serde::{Deserialize, Serialize};
 
-use crate::io::directory::Directory;
 use crate::logger::{log_info, log_warn, log_error};
-use crate::models::arguments::{Arguments, ServiceConfig};
+use crate::models::arguments::Arguments;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServiceConfig {
+    pub build: Option<String>,
+    pub volumes: Option<Vec<String>>,
+    pub networks: Option<Vec<String>>,
+    pub restart: Option<String>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConfigFile {
+    pub services: HashMap<String, ServiceConfig>,
+    pub networks: Option<HashMap<String, NetworkConfig>>
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NetworkConfig {
+    pub driver: Option<String>,
+    pub external: Option<bool>,
+    pub name: Option<String>
+}
 
 pub struct Compose {
-    args: Arguments,
-    services: Mapping,
-    networks: Mapping
+    args: Arguments
 }
 
 impl Compose {
@@ -18,30 +38,56 @@ impl Compose {
         log_info("Initializing Compose with provided arguments", None);
 
         Self {
-            args,
-            services: Mapping::new(),
-            networks: Mapping::new()
+            args
         }
     }
 
     pub fn generate(&mut self) -> Result<String, Box<dyn Error>> {
         log_info("Starting compose generation", None);
 
-        let mut compose: Mapping = Mapping::new();
+        let mut compose: Mapping = self.load_existing_compose()?;
+        let new_services: Mapping = self.generate_services()?;
+        let new_networks: Mapping = self.generate_networks()?;
 
-        self.services = self.generate_services()?;
-        self.networks = self.generate_networks()?;
-
-        compose.insert(
-            Value::String("services".to_string()),
-            Value::Mapping(self.services.clone())
-        );
-        compose.insert(
-            Value::String("networks".to_string()),
-            Value::Mapping(self.networks.clone())
-        );
+        self.merge_section(&mut compose, "services", new_services);
+        self.merge_section(&mut compose, "networks", new_networks);
 
         self.render(&compose)
+    }
+
+    fn load_existing_compose(&self) -> Result<Mapping, Box<dyn Error>> {
+        if Path::new(&self.args.output).exists() {
+            log_info("Existing compose file found, loading", Some(&self.args.output));
+            let content = fs::read_to_string(&self.args.output)?;
+            match serde_yaml::from_str(&content) {
+                Ok(Value::Mapping(existing)) => Ok(existing),
+                Ok(_) => {
+                    log_error("Invalid existing compose file structure", None);
+                    Ok(Mapping::new())
+                }
+                Err(e) => {
+                    log_error("Failed to parse existing compose file", Some(&e.to_string()));
+                    Ok(Mapping::new())
+                }
+            }
+        } else {
+            log_info("No existing compose file found, starting fresh", None);
+            Ok(Mapping::new())
+        }
+    }
+
+    fn merge_section(&self, compose: &mut Mapping, section: &str, new_data: Mapping) {
+        if let Some(Value::Mapping(existing_data)) = compose.get_mut(&Value::String(section.to_string())) {
+            for (key, value) in new_data {
+                if existing_data.contains_key(&key) {
+                    log_warn(&format!("{} already defined in existing config", section), Some(&key.as_str().unwrap_or("unknown")));
+                } else {
+                    existing_data.insert(key, value);
+                }
+            }
+        } else {
+            compose.insert(Value::String(section.to_string()), Value::Mapping(new_data));
+        }
     }
 
     fn render(&self, compose: &Mapping) -> Result<String, Box<dyn Error>> {
@@ -70,53 +116,43 @@ impl Compose {
 
         let mut services: Mapping = Mapping::new();
 
-        for (i, path) in self.args.services.iter().enumerate() {
-            let service_directory: Directory = Directory::new(path.to_owned());
-            if service_directory.exists == true {
-                if let Err(e) = self.process_service(path, i, &mut services) {
-                    log_error("Failed to process service", Some(&e.to_string()));
-                }
-            } else {
-                log_error("Service path directory not found", Some(&service_directory.path));
-            }
+        if let Err(e) = self.process_service(&self.args.service, &mut services) {
+            log_error("Failed to process service", Some(&e.to_string()));
         }
 
         Ok(services)
     }
 
-    fn process_service(&self, path: &String, index: usize, services: &mut Mapping) -> Result<(), Box<dyn Error>> {
-        let service_name = self.get_service_name(path, index);
+    fn process_service(&self, service: &String, services: &mut Mapping) -> Result<(), Box<dyn Error>> {
+        log_info("Processing Dockerfile for service", Some(&service));
 
-        log_info("Processing Dockerfile for service", Some(&service_name));
+        let mut service_config: ServiceConfig = self.create_service_config(service);
 
-        let service_config = self.create_service_config(path);
-
-        if self.service_already_defined(services, &service_name) {
-            log_warn("Service already defined, skipping", Some(&service_name));
+        if self.service_already_defined(services, &service) {
+            log_warn("Service already defined, skipping", Some(&service));
             return Ok(());
         }
 
+        service_config.volumes = match self.generate_volumes() {
+            Ok(volumes) if !volumes.is_empty() => Some(volumes),
+            Ok(_) => None,
+            Err(e) => {
+                log_error("Failed to generate volumes", Some(&e.to_string()));
+                None
+            }
+        };
+
         services.insert(
-            Value::String(service_name.clone()),
+            Value::String(service.clone()),
             serde_yaml::to_value(service_config).map_err(|e| {
                 log_error("Failed to convert service config to YAML", Some(&e.to_string()));
                 e
             })?
         );
 
-        log_info("Service added successfully", Some(&service_name));
+        log_info("Service added successfully", Some(&service));
 
         Ok(())
-    }
-
-    fn get_service_name(&self, file: &String, index: usize) -> String {
-        log_info("Determining service name from file", Some(file));
-
-        Path::new(file)
-            .file_name()
-            .and_then(|os_str| os_str.to_str())
-            .unwrap_or(&format!("service_{}", index))
-            .to_string()
     }
 
     fn create_service_config(&self, file: &String) -> ServiceConfig {
@@ -125,6 +161,7 @@ impl Compose {
         ServiceConfig {
             build: Some(file.to_string()),
             restart: Some(self.args.restart.clone()),
+            volumes: None,
             networks: Some(vec![
                 self.args.network.clone().unwrap_or_else(|| String::from("bridge"))
             ])
@@ -154,15 +191,38 @@ impl Compose {
         Ok(networks)
     }
 
+    fn generate_volumes(&self) -> Result<Vec<String>, Box<dyn Error>> {
+        log_info("Generating volumes configuration", None);
+        let mut volumes: Vec<String> = Vec::new();
+    
+        match &self.args.volume {
+            Some(volume_value) => self.add_custom_volume(&mut volumes, volume_value),
+            None => {}
+        }
+    
+        Ok(volumes)
+    }
+
     fn add_custom_network(&self, networks: &mut Mapping, network_name: &String) {
-        log_info("Adding custom network", Some(network_name));
+        log_info("Adding network", Some(network_name));
 
         if !networks.contains_key(&Value::String(network_name.clone())) {
             networks.insert(
                 Value::String(network_name.clone()),
                 Value::Mapping(self.create_bridge_config())
             );
-            log_info("Custom network added successfully", Some(network_name));
+            log_info("Network added successfully", Some(network_name));
+        }
+    }
+
+    fn add_custom_volume(&self, volumes: &mut Vec<String>, volume: &String) {
+        log_info("Adding volume", Some(volume));
+
+        if volumes.contains(volume) == false {
+            volumes.push(volume.clone());
+            log_info("Volume added successfully", Some(volume));
+        } else {
+            log_warn("Volume already added", Some(volume));
         }
     }
 

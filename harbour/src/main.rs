@@ -23,11 +23,11 @@ fn main() {
 
     let args: Arguments = Arguments::parse();
     
-    if !args.services.is_empty() {
+    if !args.service.is_empty() {
         initlialize(args);
         
         return;
     }
 
-    log_error("No Dockerfiles provided!", None);
+    log_error("No service provided", None);
 }
