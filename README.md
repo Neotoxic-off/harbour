@@ -51,3 +51,10 @@ networks:
   test_network:
     driver: bridge
 ```
+
+## Todo
+- Store config
+- Reuse previous config stored
+- Init project multi services
+- Scan Dockerfile to init docker compose
+
